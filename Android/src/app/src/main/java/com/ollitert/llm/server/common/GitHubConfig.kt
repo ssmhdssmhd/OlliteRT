@@ -54,6 +54,20 @@ object GitHubConfig {
 
   const val HUGGINGFACE_BASE_URL = "https://huggingface.co"
 
+  /**
+   * 国内可访问的 Hugging Face 镜像。仅在官方站点连接失败时自动使用。
+   * 镜像请求是否携带 Hugging Face 令牌由设置中的“国内加速镜像”开关决定。
+   */
+  const val HUGGINGFACE_MIRROR_BASE_URL = "https://hf-mirror.com"
+
+  /** 将 Hugging Face 官方地址转换为镜像地址；非 Hugging Face 地址返回 null。 */
+  fun huggingFaceMirrorUrl(url: String): String? {
+    if (!url.startsWith(HUGGINGFACE_BASE_URL)) return null
+    return HUGGINGFACE_MIRROR_BASE_URL + url.removePrefix(HUGGINGFACE_BASE_URL)
+  }
+
+  fun isHuggingFaceMirrorUrl(url: String): Boolean = url.startsWith(HUGGINGFACE_MIRROR_BASE_URL)
+
   // ---------------------------------------------------------------------------
   // Model allowlists and documentation (hosted in this repo)
   // ---------------------------------------------------------------------------

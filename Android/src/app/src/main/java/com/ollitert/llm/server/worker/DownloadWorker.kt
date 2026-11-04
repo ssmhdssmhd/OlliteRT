@@ -34,7 +34,11 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.ollitert.llm.server.MainActivity
 import com.ollitert.llm.server.R
+import com.ollitert.llm.server.common.GitHubConfig
+import com.ollitert.llm.server.data.allowlist.ModelUrlResult
+import com.ollitert.llm.server.data.allowlist.probeModelUrl
 import com.ollitert.llm.server.data.prefs.DOWNLOAD_CONNECT_TIMEOUT_MS
+import com.ollitert.llm.server.data.prefs.ServerPrefs
 import com.ollitert.llm.server.data.storage.DOWNLOAD_FOREGROUND_UPDATE_INTERVAL_MS
 import com.ollitert.llm.server.data.storage.DOWNLOAD_PROGRESS_UPDATE_INTERVAL_MS
 import com.ollitert.llm.server.data.prefs.DOWNLOAD_READ_TIMEOUT_MS
@@ -163,12 +167,28 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
           }
           Log.d(TAG, "About to download: $allFiles")
 
+          // 国内网络通常无法直连 huggingface.co：先探测官方地址，失败则自动切换到镜像。
+          // 是否允许使用镜像由设置中的“国内加速镜像”开关控制。
+          val mirrorEnabled = ServerPrefs.isHfMirrorEnabled(applicationContext)
+          val useMirror =
+            mirrorEnabled &&
+              fileUrl.startsWith(GitHubConfig.HUGGINGFACE_BASE_URL) &&
+              probeModelUrl(fileUrl, accessToken) is ModelUrlResult.Error
+          if (useMirror) {
+            Log.i(
+              TAG,
+              "Official Hugging Face is unreachable, using mirror ${GitHubConfig.HUGGINGFACE_MIRROR_BASE_URL}",
+            )
+          }
+
           // Sequential download -- parallel would speed up multi-file models but complicates progress tracking
           var downloadedBytes = 0L
           val bytesReadSizeBuffer: MutableList<Long> = mutableListOf()
           val bytesReadLatencyBuffer: MutableList<Long> = mutableListOf()
           for (file in allFiles) {
-            val url = URL(file.url)
+            val effectiveUrl =
+              if (useMirror) GitHubConfig.huggingFaceMirrorUrl(file.url) ?: file.url else file.url
+            val url = URL(effectiveUrl)
 
             // Prepare output file's dir.
             val outputDir =
@@ -195,8 +215,14 @@ class DownloadWorker(context: Context, params: WorkerParameters) :
             connection.readTimeout = DOWNLOAD_READ_TIMEOUT_MS
             try {
               // Scope the credential to huggingface.co — download URLs can point
-              // to third-party hosts declared by user-added repos.
-              if (accessToken != null && isHuggingFaceUrl(file.url)) {
+              // to third-party hosts declared by user-added repos. When the mirror
+              // fallback is active the token is forwarded to hf-mirror.com only
+              // because the user enabled “国内加速镜像” in Settings.
+              val tokenHostAllowed =
+                isHuggingFaceUrl(effectiveUrl) ||
+                  (useMirror &&
+                    effectiveUrl.startsWith(GitHubConfig.HUGGINGFACE_MIRROR_BASE_URL))
+              if (accessToken != null && tokenHostAllowed) {
                 Log.d(TAG, "Using access token: configured (redacted)")
                 connection.setRequestProperty("Authorization", "Bearer $accessToken")
               }

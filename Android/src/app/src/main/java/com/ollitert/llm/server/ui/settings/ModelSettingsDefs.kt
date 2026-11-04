@@ -40,6 +40,17 @@ val HF_TOKEN = SettingDef.TextInput(
   write = { repo, v -> repo.setHfToken(v) },
 )
 
+val HF_MIRROR = SettingDef.Toggle(
+  key = "hf_mirror_enabled",
+  labelRes = R.string.settings_hf_mirror_enabled,
+  descriptionRes = R.string.settings_hf_mirror_desc,
+  card = CardId.HF_TOKEN,
+  default = true,
+  prefsKey = "hf_mirror_enabled",
+  read = { it.isHfMirrorEnabled() },
+  write = { repo, v -> repo.setHfMirrorEnabled(v) },
+)
+
 // ─── Model Behaviour Card ─────────────────────────────────────────────
 
 val CUSTOM_PROMPTS = SettingDef.Toggle(

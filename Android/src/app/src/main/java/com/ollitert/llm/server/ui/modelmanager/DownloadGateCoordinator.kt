@@ -58,6 +58,14 @@ internal sealed class DownloadGateOutcome {
 internal class DownloadGateCoordinator(
   private val probeUrl: suspend (model: Model, accessToken: String?) -> ModelUrlResult,
   private val storedHfToken: () -> String?,
+  /**
+   * Optional fallback probe against the domestic Hugging Face mirror. Only used when the
+   * official site cannot be reached. If a token is configured it is also sent to the
+   * mirror (controlled by the “国内加速镜像” setting) so gated models remain downloadable.
+   */
+  private val mirrorProbeUrl: (suspend (model: Model, accessToken: String?) -> ModelUrlResult)? = null,
+  /** Whether the domestic mirror fallback is allowed (Settings → HF token card). */
+  private val isMirrorEnabled: () -> Boolean = { false },
 ) {
   /**
    * Resolves what should happen when the user requests downloading [model].
@@ -72,8 +80,8 @@ internal class DownloadGateCoordinator(
     Log.d(TAG, "Model '${model.name}' is from HuggingFace. Checking if auth is required")
     return when (val firstResult = probeUrl(model, null)) {
       is ModelUrlResult.Error -> {
-        Log.e(TAG, "Network error: ${firstResult.message}")
-        DownloadGateOutcome.NetworkError(firstResult.message)
+        Log.w(TAG, "Official Hugging Face probe failed (${firstResult.message}); trying mirror")
+        resolveViaMirror(model, fallbackMessage = firstResult.message)
       }
       is ModelUrlResult.Success -> when (firstResult.code) {
         HttpURLConnection.HTTP_OK -> {
@@ -86,6 +94,43 @@ internal class DownloadGateCoordinator(
         }
         else -> resolveWithStoredToken(model)
       }
+    }
+  }
+
+  /**
+   * 官方站点不可达时，改用国内镜像再探测一次；镜像同样不可达则返回原网络错误。
+   * 是否允许使用镜像由设置中的“国内加速镜像”开关控制。
+   */
+  private suspend fun resolveViaMirror(
+    model: Model,
+    fallbackMessage: String,
+  ): DownloadGateOutcome {
+    if (!isMirrorEnabled()) return DownloadGateOutcome.NetworkError(fallbackMessage)
+    val probe = mirrorProbeUrl ?: return DownloadGateOutcome.NetworkError(fallbackMessage)
+    val mirrorUrl =
+      GitHubConfig.huggingFaceMirrorUrl(model.url)
+        ?: return DownloadGateOutcome.NetworkError(fallbackMessage)
+    val token = storedHfToken()
+
+    return when (val result = probe(model.copy(url = mirrorUrl), token)) {
+      is ModelUrlResult.Error -> {
+        Log.w(TAG, "Mirror probe failed too: ${result.message}")
+        DownloadGateOutcome.NetworkError(fallbackMessage)
+      }
+      is ModelUrlResult.Success ->
+        when (result.code) {
+          HttpURLConnection.HTTP_OK -> {
+            Log.i(TAG, "Mirror reachable for '${model.name}'. Starting download via mirror.")
+            DownloadGateOutcome.StartDownload(token)
+          }
+          HttpURLConnection.HTTP_NOT_FOUND -> DownloadGateOutcome.ModelNotFound
+          HttpURLConnection.HTTP_UNAUTHORIZED,
+          HttpURLConnection.HTTP_FORBIDDEN ->
+            DownloadGateOutcome.NeedsHfToken(
+              if (token == null) HfTokenDialogReason.MISSING else HfTokenDialogReason.INVALID,
+            )
+          else -> DownloadGateOutcome.NetworkError(fallbackMessage)
+        }
     }
   }
 
@@ -131,6 +176,10 @@ internal class DownloadGateCoordinator(
       DownloadGateCoordinator(
         probeUrl = { model, accessToken -> viewModel.getModelUrlResponse(model = model, accessToken = accessToken) },
         storedHfToken = { configuredHfTokenOrNull(viewModel.getHfToken()) },
+        mirrorProbeUrl = { model, accessToken ->
+          viewModel.getModelUrlResponse(model = model, accessToken = accessToken)
+        },
+        isMirrorEnabled = { viewModel.isHfMirrorEnabled() },
       )
   }
 }

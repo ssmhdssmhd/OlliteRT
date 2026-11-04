@@ -7,6 +7,13 @@ All notable changes to OlliteRT are documented in [GitHub Releases](https://gith
 
 ## 版本更新记录（中文）
 
+### v0.9.9 — 国内模型下载修复
+
+- **新增**：无法直连 `huggingface.co` 时，模型下载与下载前探测自动回退到 `hf-mirror.com`。
+- **新增**：设置 → Hugging Face Token 卡片新增「国内加速镜像」开关（默认开启）。
+- **优化**：受限（gated）模型可通过镜像下载；令牌仅在开启镜像时发送给 `hf-mirror.com`，可在设置中关闭以停止共享。
+- **优化**：镜像下载继续沿用断点续传；已下载的部分文件可直接续传。
+
 ### v0.9.8 — 简体中文界面与云端打包
 
 - **新增**：完整简体中文（`zh-CN`）界面，系统语言为中文时自动切换。

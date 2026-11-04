@@ -238,6 +238,7 @@ constructor(
   fun setInferenceConfig(prefsKey: String, configValues: Map<String, Any>) = preferencesRepository.setInferenceConfig(prefsKey, configValues)
   fun getPort(): Int = preferencesRepository.getPort()
   fun getHfToken(): String = preferencesRepository.getHfToken()
+  fun isHfMirrorEnabled(): Boolean = preferencesRepository.isHfMirrorEnabled()
 
   private fun notifyStorageChanged() {
     _uiState.update { it.copy(storageUpdateTrigger = System.currentTimeMillis()) }
@@ -404,7 +405,8 @@ constructor(
   }
 
   fun getModelUrlResponse(model: Model, accessToken: String? = null): ModelUrlResult {
-    val result = probeModelUrl(model.url, accessToken)
+    val allowMirrorToken = GitHubConfig.isHuggingFaceMirrorUrl(model.url)
+    val result = probeModelUrl(model.url, accessToken, allowMirrorToken)
     if (result is ModelUrlResult.Error) {
       Log.e(TAG, result.message)
     }

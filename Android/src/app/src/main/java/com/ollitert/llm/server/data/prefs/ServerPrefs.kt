@@ -201,6 +201,13 @@ object ServerPrefs {
     ServerPrefsNetwork.setHfToken(prefs(context), token)
   }
 
+  fun isHfMirrorEnabled(context: Context): Boolean =
+    ServerPrefsNetwork.isHfMirrorEnabled(prefs(context))
+
+  fun setHfMirrorEnabled(context: Context, enabled: Boolean) {
+    ServerPrefsNetwork.setHfMirrorEnabled(prefs(context), enabled)
+  }
+
   fun getCorsAllowedOrigins(context: Context): String =
     ServerPrefsNetwork.getCorsAllowedOrigins(prefs(context))
 

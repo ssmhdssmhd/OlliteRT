@@ -15,6 +15,7 @@
  */
 
 package com.ollitert.llm.server.data.allowlist
+import com.ollitert.llm.server.common.GitHubConfig
 import com.ollitert.llm.server.data.model.Model
 import com.ollitert.llm.server.data.prefs.HTTP_CONNECT_TIMEOUT_MS
 import com.ollitert.llm.server.data.prefs.HTTP_READ_TIMEOUT_MS
@@ -123,6 +124,7 @@ sealed class ModelUrlResult {
 internal fun probeModelUrl(
   modelUrl: String,
   accessToken: String?,
+  allowMirrorToken: Boolean = false,
   openConnection: (String) -> HttpURLConnection = { URL(it).openConnection() as HttpURLConnection },
 ): ModelUrlResult {
   var connection: HttpURLConnection? = null
@@ -134,7 +136,11 @@ internal fun probeModelUrl(
     connection.readTimeout = HTTP_READ_TIMEOUT_MS
     connection.instanceFollowRedirects = false
     // Scope the credential to huggingface.co — the probe URL can point anywhere.
-    if (accessToken != null && isHuggingFaceUrl(modelUrl)) {
+    // Mirror probing may opt in to receive the token (国内加速镜像 setting) so gated
+    // models can still be resolved when the official site is unreachable.
+    if (accessToken != null &&
+      (isHuggingFaceUrl(modelUrl) || (allowMirrorToken && GitHubConfig.isHuggingFaceMirrorUrl(modelUrl)))
+    ) {
       connection.setRequestProperty("Authorization", "Bearer $accessToken")
     }
     connection.connect()

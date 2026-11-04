@@ -300,6 +300,8 @@
   <!-- Settings: Hugging Face Token card -->
   <string name="settings_card_hf_token">Hugging Face Token</string>
   <string name="settings_hf_token_desc">从 Hugging Face 下载模型时需要。获取令牌：</string>
+  <string name="settings_hf_mirror_enabled">国内加速镜像</string>
+  <string name="settings_hf_mirror_desc">无法直连 huggingface.co 时自动改用 hf-mirror.com。为下载受限模型，已配置的 Hugging Face 令牌会发送给该第三方镜像；如不希望共享令牌，请关闭此项。</string>
   <string name="settings_hf_token_link_text">huggingface.co/settings/tokens</string>
   <string name="settings_hf_token_placeholder">hf_…</string>
   <string name="settings_hf_token_hide">隐藏令牌</string>

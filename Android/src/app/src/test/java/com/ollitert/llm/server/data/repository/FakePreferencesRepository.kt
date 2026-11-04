@@ -47,6 +47,7 @@ class FakePreferencesRepository : PreferencesRepository {
   private var _updateCheckEnabled: Boolean = true
   private var _updateCheckIntervalHours: Int = 24
   private var _hfToken: String = ""
+  private var _hfMirrorEnabled: Boolean = true
   private var _customPromptsEnabled: Boolean = false
   private var _autoTruncateHistory: Boolean = false
   private var _autoTrimPrompts: Boolean = false
@@ -126,6 +127,8 @@ class FakePreferencesRepository : PreferencesRepository {
   override fun setUpdateCheckIntervalHours(hours: Int) { this._updateCheckIntervalHours = hours }
   override fun getHfToken(): String = _hfToken
   override fun setHfToken(token: String) { this._hfToken = token }
+  override fun isHfMirrorEnabled(): Boolean = _hfMirrorEnabled
+  override fun setHfMirrorEnabled(enabled: Boolean) { this._hfMirrorEnabled = enabled }
   override fun isCustomPromptsEnabled(): Boolean = _customPromptsEnabled
   override fun setCustomPromptsEnabled(enabled: Boolean) { this._customPromptsEnabled = enabled }
   override fun isAutoTruncateHistory(): Boolean = _autoTruncateHistory
@@ -213,6 +216,7 @@ class FakePreferencesRepository : PreferencesRepository {
     _updateCheckEnabled = true
     _updateCheckIntervalHours = 24
     _hfToken = ""
+    _hfMirrorEnabled = true
     _customPromptsEnabled = false
     _autoTruncateHistory = true
     _autoTrimPrompts = false

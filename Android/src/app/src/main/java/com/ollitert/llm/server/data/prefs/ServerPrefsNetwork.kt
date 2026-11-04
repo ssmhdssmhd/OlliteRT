@@ -30,6 +30,8 @@ internal const val KEY_CLIENT_IP_POLICY_MODE = "client_ip_policy_mode"
 internal const val KEY_CLIENT_IP_RULES = "client_ip_rules"
 internal const val KEY_BEARER_TOKEN = "bearer_token"
 internal const val KEY_HF_TOKEN = "hf_token"
+internal const val KEY_HF_MIRROR_ENABLED = "hf_mirror_enabled"
+internal const val DEFAULT_HF_MIRROR_ENABLED = true
 internal const val KEY_CORS_ALLOWED_ORIGINS = "cors_allowed_origins"
 internal const val DEFAULT_CORS_ALLOWED_ORIGINS = "*"
 
@@ -86,6 +88,13 @@ internal object ServerPrefsNetwork {
 
   fun setHfToken(prefs: SharedPreferences, token: String) {
     prefs.edit { putString(KEY_HF_TOKEN, token.trim()) }
+  }
+
+  fun isHfMirrorEnabled(prefs: SharedPreferences): Boolean =
+    prefs.getBoolean(KEY_HF_MIRROR_ENABLED, DEFAULT_HF_MIRROR_ENABLED)
+
+  fun setHfMirrorEnabled(prefs: SharedPreferences, enabled: Boolean) {
+    prefs.edit { putBoolean(KEY_HF_MIRROR_ENABLED, enabled) }
   }
 
   fun getCorsAllowedOrigins(prefs: SharedPreferences): String =

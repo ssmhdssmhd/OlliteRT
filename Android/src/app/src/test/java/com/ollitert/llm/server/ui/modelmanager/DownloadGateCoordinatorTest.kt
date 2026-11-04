@@ -37,9 +37,17 @@ class DownloadGateCoordinatorTest {
   private fun coordinator(
     probe: (Model, String?) -> ModelUrlResult,
     storedToken: String? = null,
+    mirrorProbe: ((Model, String?) -> ModelUrlResult)? = null,
+    mirrorEnabled: Boolean = false,
   ) = DownloadGateCoordinator(
     probeUrl = { model, token -> probe(model, token) },
     storedHfToken = { storedToken },
+    mirrorProbeUrl = if (mirrorProbe != null) {
+      { model, token -> mirrorProbe(model, token) }
+    } else {
+      null
+    },
+    isMirrorEnabled = { mirrorEnabled },
   )
 
   @Test
@@ -69,6 +77,42 @@ class DownloadGateCoordinatorTest {
   fun anonymousProbeNetworkErrorYieldsNetworkError() = runTest {
     val gate = coordinator(probe = { _, _ -> ModelUrlResult.Error("offline") })
     assertEquals(DownloadGateOutcome.NetworkError("offline"), gate.resolveDownloadAccess(hfModel))
+  }
+
+  @Test
+  fun networkErrorFallsBackToEnabledMirror() = runTest {
+    val gate = coordinator(
+      probe = { model, _ ->
+        if (model.url.startsWith(GitHubConfig.HUGGINGFACE_MIRROR_BASE_URL)) {
+          ModelUrlResult.Success(HttpURLConnection.HTTP_OK)
+        } else {
+          ModelUrlResult.Error("offline")
+        }
+      },
+      storedToken = "hf_test",
+      mirrorProbe = { model, token ->
+        assertEquals(GitHubConfig.HUGGINGFACE_MIRROR_BASE_URL + "org/repo", model.url)
+        assertEquals("hf_test", token)
+        ModelUrlResult.Success(HttpURLConnection.HTTP_OK)
+      },
+      mirrorEnabled = true,
+    )
+    assertEquals(
+      DownloadGateOutcome.StartDownload("hf_test"),
+      gate.resolveDownloadAccess(hfModel),
+    )
+  }
+
+  @Test
+  fun networkErrorDoesNotUseMirrorWhenDisabled() = runTest {
+    var mirrorProbes = 0
+    val gate = coordinator(
+      probe = { _, _ -> ModelUrlResult.Error("offline") },
+      mirrorProbe = { _, _ -> mirrorProbes++; ModelUrlResult.Success(HttpURLConnection.HTTP_OK) },
+      mirrorEnabled = false,
+    )
+    assertEquals(DownloadGateOutcome.NetworkError("offline"), gate.resolveDownloadAccess(hfModel))
+    assertEquals(0, mirrorProbes)
   }
 
   @Test

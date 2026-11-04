@@ -300,6 +300,8 @@
   <!-- Settings: Hugging Face Token card -->
   <string name="settings_card_hf_token">Hugging Face Token</string>
   <string name="settings_hf_token_desc">Required for downloading models from Hugging Face. Get your token from</string>
+  <string name="settings_hf_mirror_enabled">China download mirror</string>
+  <string name="settings_hf_mirror_desc">Automatically use hf-mirror.com when huggingface.co cannot be reached. To download gated models, the configured Hugging Face token is sent to this third-party mirror; disable this if you do not want to share it.</string>
   <string name="settings_hf_token_link_text">huggingface.co/settings/tokens</string>
   <string name="settings_hf_token_placeholder">hf_…</string>
   <string name="settings_hf_token_hide">Hide token</string>
