@@ -507,8 +507,8 @@
   <string name="status_model_loading">正在加载…</string>
   <string name="status_cd_thinking_enabled">已启用思考</string>
   <string name="status_cd_mtp_enabled">已启用投机解码</string>
-  <string name="status_loading_elapsed">正在加载… %1$s 秒</string>
-  <string name="status_loading_elapsed_with_size">%1$s · 正在加载… %2$s 秒</string>
+  <string name="status_loading_elapsed">正在加载… %1$d 秒</string>
+  <string name="status_loading_elapsed_with_size">%1$s · 正在加载… %2$d 秒</string>
   <string name="status_idle_unloaded">空闲 — 模型已卸载以释放 RAM</string>
   <string name="status_loaded_in">已加载，用时 %1$s</string>
   <string name="status_loaded_in_with_size">%1$s · 加载用时 %2$s</string>
@@ -633,7 +633,7 @@
   <string name="logs_entry_response_label">响应 · %1$s</string>
   <string name="logs_entry_response">响应</string>
   <string name="logs_entry_pending_in_queue">排队等待中…</string>
-  <string name="logs_processing_elapsed_seconds">已用时 · %1$s 秒</string>
+  <string name="logs_processing_elapsed_seconds">已用时 · %1$d 秒</string>
   <string name="logs_entry_request">请求</string>
 
   <!-- LogEntryCard: Cancelled state -->
