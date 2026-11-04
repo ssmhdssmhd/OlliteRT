@@ -1,0 +1,23 @@
+OlliteRT v0.9.9（稳定版）
+
+构建时间： 202611042320（北京时间）
+
+更新内容
+
+• 修复中文资源格式占位符类型不一致导致的 lint 失败（bd157a53）
+• v0.9.9 修复国内模型下载：自动回退 hf-mirror.com（7463bd7d）
+• Add fastlane changelog for v0.9.8 (versionCode 2)（103c73bd）
+
+对比上一版本：v0.9.8
+
+下载安装
+
+| 文件 | 适用设备 |
+|------|----------|
+| OlliteRT.stable.0.9.9.202611042320.apk | arm64-v8a，Android 12 及以上 |
+
+GitHub Release 直链（支持断点续传）：
+
+https://github.com/ssmhdssmhd/OlliteRT/releases/download/v0.9.9/OlliteRT.stable.0.9.9.202611042320.apk
+
+国内加速（第三方镜像，在直链前加上镜像前缀）：
