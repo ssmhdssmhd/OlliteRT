@@ -1,0 +1,12 @@
+OlliteRT v0.9.8（稳定版）
+
+构建时间： 202611042142（北京时间）
+
+更新内容
+
+• feat: 新增简体中文界面与云端打包流程（v0.9.8）（fe1a3437）
+• Validate model downloads before marking them complete (#44)（dd352416）
+• Protect inference requests from untrusted browser origins（8a54ab3d）
+• Bound multipart audio uploads and release stalled parts（e94b6208）
+• Bound concurrent inference request body processing（f045a20f）
+• Reject non-finite sampler values and recover settings（732e136d）
