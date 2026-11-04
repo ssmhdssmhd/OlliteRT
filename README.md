@@ -67,6 +67,33 @@
 > [!IMPORTANT]
 > Requires: Android 12+ · **arm64-v8a** device · 6 GB RAM minimum · 8 GB+ recommended for multimodal models (see [model table](#available-models))
 
+## 中文说明 · 国内下载与云端打包
+
+- **中文界面**：已内置简体中文（`zh-CN`）资源，系统语言为中文时自动显示中文界面。
+- **应用下载支持断点续传**：请从 [GitHub Releases](https://github.com/ssmhdssmhd/OlliteRT/releases) 下载 APK。Release 资产支持 HTTP Range，可用 IDM、aria2 或多线程下载器断点续传；Actions 页面里的 Artifact（zip）**不支持断点续传**，仅建议临时测试使用。
+- **国内加速**：在 Release 直链前加上镜像前缀即可，例如：
+
+  ```text
+  https://ghproxy.net/https://github.com/ssmhdssmhd/OlliteRT/releases/download/<tag>/<apk>
+  https://ghfast.top/https://github.com/ssmhdssmhd/OlliteRT/releases/download/<tag>/<apk>
+  ```
+
+  第三方镜像可能失效，失效时请改用直链或更换镜像。
+- **模型下载**：应用内模型下载已支持断点续传（自动使用 HTTP Range 从已下载位置继续），网络中断后重新点击下载即可续传。
+
+### 使用 GitHub Actions 云端打包
+
+1. 打开仓库 **Actions** → 选择 **“云端打包并发布 APK（稳定版/测试版/开发版）”** → **Run workflow**。
+2. 勾选 **“仅云端打包”**（默认开启），选择渠道 `stable` / `beta` / `dev`，点击运行即可，无需创建标签。
+3. 构建完成后在该次运行的 **Artifacts** 中下载 zip，或在运行摘要中查看 APK 信息。
+4. 如需正式发布：取消“仅云端打包”，填写版本标签（如 `v0.9.8`），勾选“创建 GitHub Release”，构建完成后会自动生成中文 Release 说明并上传 APK 与 SHA256。
+
+产物命名规则：`OlliteRT.<渠道>.<版本号>.<yyyyMMddHHmm>.apk`（例如 `OlliteRT.stable.0.9.8.202611042130.apk`），全部使用点号分隔，不使用连字符。
+
+### 签名
+
+CI 使用仓库 Secrets 中的固定签名（`KEYSTORE_BASE64` / `STORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD`），所有版本签名一致，可覆盖安装，不会出现签名冲突。
+
 ## Available Models
 
 | Model | Size | Min RAM | Context | Capabilities |

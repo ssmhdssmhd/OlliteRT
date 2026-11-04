@@ -5,6 +5,17 @@ All notable changes to OlliteRT are documented in [GitHub Releases](https://gith
 > [!TIP]
 > Each release includes a signed arm64-v8a APK download and a full summary of changes.
 
+## 版本更新记录（中文）
+
+### v0.9.8 — 简体中文界面与云端打包
+
+- **新增**：完整简体中文（`zh-CN`）界面，系统语言为中文时自动切换。
+- **新增**：GitHub Actions 手动云端打包，勾选“仅云端打包”即可构建，无需创建标签。
+- **新增**：Release 页面自动生成中文更新说明与 SHA256 校验值。
+- **优化**：APK 产物命名统一为 `OlliteRT.<渠道>.<版本号>.<yyyyMMddHHmm>.apk`，使用点号分隔。
+- **优化**：Release 资产支持 HTTP Range 断点续传，并附带国内加速镜像地址。
+- **修复**：CI 使用固定签名，确保各版本签名一致，可覆盖安装、无签名冲突。
+
 ## Release Tag Convention
 
 | Channel | Tag Format | GitHub Flag | Example |

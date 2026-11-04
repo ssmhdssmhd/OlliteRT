@@ -1,4 +1,4 @@
-name: Build and release signed APK from version tag (stable/beta/dev)
+name: 云端打包并发布 APK（稳定版/测试版/开发版）
 
 on:
   push:
@@ -6,19 +6,27 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Version tag (e.g. v1.0.0, v1.0.0-beta.1, v1.0.0-dev.2)'
-        required: true
       build_only:
-        description: 'Build APK only — no tag, no release (for test builds)'
+        description: '仅云端打包，不创建标签、不发布 Release（推荐日常打包使用）'
         type: boolean
-        default: false
+        default: true
+      channel:
+        description: '构建渠道（仅“仅云端打包”模式生效）'
+        type: choice
+        options:
+          - stable
+          - beta
+          - dev
+        default: stable
+      tag:
+        description: '版本标签（发布 Release 时填写，例如 v0.9.8；仅云端打包可留空）'
+        required: false
       create_tag:
-        description: 'Create the tag if it does not exist yet (ignored when build_only)'
+        description: '标签不存在时自动创建（忽略“仅云端打包”）'
         type: boolean
         default: false
       publish:
-        description: 'Create a GitHub Release (ignored when build_only)'
+        description: '创建 GitHub Release（忽略“仅云端打包”）'
         type: boolean
         default: true
 
@@ -27,7 +35,7 @@ permissions:
 
 concurrency:
   # Normalize: dispatch uses 'v1.0.0', push uses 'refs/tags/v1.0.0'
-  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  group: release-${{ github.event.inputs.tag || github.event.inputs.channel || github.ref_name }}
   cancel-in-progress: true
 
 env:
@@ -48,12 +56,16 @@ jobs:
 
     steps:
       - name: Validate tag format
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_only != 'true' }}
         env:
           INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
+          if [[ -z "$INPUT_TAG" ]]; then
+            echo "::error::发布 Release 时必须填写版本标签（例如 v0.9.8）；仅云端打包请勾选“仅云端打包”。"
+            exit 1
+          fi
           if [[ ! "$INPUT_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+|-dev\.[0-9]+)?$ ]]; then
-            echo "::error::Invalid tag format: $INPUT_TAG (expected vX.Y.Z, vX.Y.Z-beta.N, or vX.Y.Z-dev.N)"
+            echo "::error::标签格式无效：$INPUT_TAG（应为 vX.Y.Z、vX.Y.Z-beta.N 或 vX.Y.Z-dev.N）"
             exit 1
           fi
         working-directory: .
@@ -114,8 +126,30 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_TAG: ${{ github.event.inputs.tag }}
+          BUILD_ONLY: ${{ github.event.inputs.build_only }}
+          CHANNEL_INPUT: ${{ github.event.inputs.channel }}
         run: |
-          # Use the pushed tag, or the manual input
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$BUILD_ONLY" = "true" ]; then
+            # 手动云端打包：不需要标签，直接使用 gradle.properties 中的版本号
+            VERSION=$(grep -oP '(?<=^APP_VERSION_NAME=).+' gradle.properties)
+            TAG="v${VERSION}"
+            CHANNEL="$CHANNEL_INPUT"
+            case "$CHANNEL" in
+              stable) TASK=assembleStableRelease; PRERELEASE=false ;;
+              beta)   TASK=assembleBetaRelease;   PRERELEASE=true ;;
+              dev)    TASK=assembleDevRelease;    PRERELEASE=true ;;
+              *) echo "::error::未知构建渠道：$CHANNEL"; exit 1 ;;
+            esac
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+            echo "task=$TASK" >> "$GITHUB_OUTPUT"
+            echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+            echo "flavor=$CHANNEL" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # 使用推送的标签，或手动输入的标签
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             TAG="$INPUT_TAG"
           else
@@ -144,7 +178,7 @@ jobs:
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
             echo "flavor=dev" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::Unrecognized tag format: $TAG (expected vX.Y.Z, vX.Y.Z-beta.N, or vX.Y.Z-dev.N)"
+            echo "::error::无法识别的标签格式：$TAG（应为 vX.Y.Z、vX.Y.Z-beta.N 或 vX.Y.Z-dev.N）"
             exit 1
           fi
 
@@ -218,26 +252,39 @@ jobs:
         env:
           TAG: ${{ steps.tag.outputs.tag }}
           FLAVOR: ${{ steps.tag.outputs.flavor }}
+          CHANNEL: ${{ steps.tag.outputs.channel }}
+          VERSION: ${{ steps.tag.outputs.version }}
         run: |
           OUT_DIR="app/build/outputs/apk/${FLAVOR}/release"
           RELEASE_DIR="release-apks"
           mkdir -p "$RELEASE_DIR"
 
+          # 文件名规则：文件名.版本号.时间（点号分隔，不使用连字符）
+          VERSION_DOTTED="${VERSION//-/.}"
+          STAMP=$(TZ=Asia/Shanghai date +%Y%m%d%H%M)
+
           shopt -s nullglob
+          INDEX=0
           for APK in "$OUT_DIR"/*.apk; do
-            BASENAME=$(basename "$APK")
-            DEST="$RELEASE_DIR/OlliteRT-${TAG}-arm64-v8a.apk"
+            INDEX=$((INDEX + 1))
+            if [ "$INDEX" -eq 1 ]; then
+              DEST="$RELEASE_DIR/OlliteRT.${CHANNEL}.${VERSION_DOTTED}.${STAMP}.apk"
+            else
+              DEST="$RELEASE_DIR/OlliteRT.${CHANNEL}.${VERSION_DOTTED}.${STAMP}.${INDEX}.apk"
+            fi
             cp "$APK" "$DEST"
             SIZE=$(stat -c%s "$DEST")
             echo "$(basename "$DEST"): $(numfmt --to=iec-i --suffix=B $SIZE)"
+            if [ "$INDEX" -eq 1 ]; then echo "apk_name=$(basename "$DEST")" >> "$GITHUB_OUTPUT"; fi
           done
 
           if [ -z "$(ls -A "$RELEASE_DIR" 2>/dev/null)" ]; then
-            echo "::error::No APK files found in $OUT_DIR — build or signing may have failed"
+            echo "::error::未找到 APK 文件（$OUT_DIR）——构建或签名可能失败"
             exit 1
           fi
 
           echo "dir=$RELEASE_DIR" >> "$GITHUB_OUTPUT"
+          echo "stamp=$STAMP" >> "$GITHUB_OUTPUT"
 
       - name: Generate SHA256 checksums
         id: checksums
@@ -252,7 +299,7 @@ jobs:
         id: upload
         uses: actions/upload-artifact@v7
         with:
-          name: OlliteRT-${{ steps.tag.outputs.tag }}-arm64-v8a
+          name: OlliteRT.${{ steps.tag.outputs.channel }}.${{ steps.apks.outputs.stamp }}
           path: Android/src/${{ steps.apks.outputs.dir }}/*.apk
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
 
@@ -284,7 +331,7 @@ jobs:
           EXPIRY_DATE=$(date -d "+${RETENTION_DAYS} days" "+%B %d, %Y")
 
           SUFFIX=""
-          if [ "$BUILD_ONLY" = "true" ]; then SUFFIX=" (build only)"; fi
+          if [ "$BUILD_ONLY" = "true" ]; then SUFFIX="（仅云端打包，未发布）"; fi
 
           WILL_PUBLISH="false"
           if [ "$EVENT_NAME" = "push" ] || [ "$PUBLISH" = "true" ]; then
@@ -294,37 +341,37 @@ jobs:
           fi
 
           {
-            echo "## Release Build: ${TAG}${SUFFIX}"
+            echo "## 云端打包结果：${TAG}${SUFFIX}"
             echo ""
-            echo "| Property | Value |"
-            echo "|----------|-------|"
-            echo "| **Branch** | \`${BRANCH}\` |"
-            echo "| **Channel** | ${CHANNEL} |"
-            echo "| **Version code** | ${VERSION_CODE} |"
-            echo "| **Commit** | [\`${COMMIT_SHA}\`](https://github.com/${REPO}/commit/${COMMIT_FULL}) |"
-            echo "| **APK** | \`${APK_NAME}\` |"
-            echo "| **Size** | ${APK_SIZE} |"
-            echo "| **Download** | [OlliteRT-${TAG}-arm64-v8a.zip](${ARTIFACT_URL}) |"
+            echo "| 项目 | 内容 |"
+            echo "|------|------|"
+            echo "| **分支** | \`${BRANCH}\` |"
+            echo "| **渠道** | ${CHANNEL} |"
+            echo "| **版本号（versionCode）** | ${VERSION_CODE} |"
+            echo "| **提交** | [\`${COMMIT_SHA}\`](https://github.com/${REPO}/commit/${COMMIT_FULL}) |"
+            echo "| **APK 文件** | \`${APK_NAME}\` |"
+            echo "| **大小** | ${APK_SIZE} |"
+            echo "| **下载（Actions 产物，不支持断点续传）** | [${APK_NAME%.apk}.zip](${ARTIFACT_URL}) |"
             if [ "$WILL_PUBLISH" != "true" ]; then
-              echo "| **Artifact expires** | ${EXPIRY_DATE} |"
+              echo "| **产物有效期至** | ${EXPIRY_DATE} |"
             fi
             echo ""
             if [ "$WILL_PUBLISH" = "true" ]; then
-              echo "**Release:** [GitHub Release](https://github.com/${REPO}/releases/tag/${TAG})"
+              echo "**Release（支持断点续传）：** [GitHub Release](https://github.com/${REPO}/releases/tag/${TAG})"
               echo ""
             fi
-            echo "<details><summary>Build environment</summary>"
+            echo "<details><summary>构建环境</summary>"
             echo ""
-            echo "- Gradle task: \`${GRADLE_TASK}\`"
-            echo "- Gradle: \`${GRADLE_VERSION}\`"
-            echo "- JDK: \`${JDK_VERSION}\`"
-            echo "- Android SDK: \`${SDK_VERSION}\`"
-            echo "- compileSdk: \`${COMPILE_SDK}\`"
-            echo "- buildTools: \`${BUILD_TOOLS}\`"
+            echo "- Gradle 任务：\`${GRADLE_TASK}\`"
+            echo "- Gradle：\`${GRADLE_VERSION}\`"
+            echo "- JDK：\`${JDK_VERSION}\`"
+            echo "- Android SDK：\`${SDK_VERSION}\`"
+            echo "- compileSdk：\`${COMPILE_SDK}\`"
+            echo "- buildTools：\`${BUILD_TOOLS}\`"
             echo "</details>"
             echo ""
             CHECKSUM=$(awk '{print $1}' "$RELEASE_DIR/SHA256SUMS.txt" | head -1)
-            echo "<details><summary>SHA256 checksum</summary>"
+            echo "<details><summary>SHA256 校验值</summary>"
             echo ""
             echo "\`\`\`"
             echo "$CHECKSUM"
@@ -332,14 +379,84 @@ jobs:
             echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Generate Chinese release notes
+        id: notes
+        if: ${{ github.event.inputs.build_only != 'true' && (github.event_name == 'push' || github.event.inputs.publish == 'true') }}
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          REPO: ${{ github.repository }}
+          CHANNEL: ${{ steps.tag.outputs.channel }}
+          APK_NAME: ${{ steps.apks.outputs.apk_name }}
+          STAMP: ${{ steps.apks.outputs.stamp }}
+          RELEASE_DIR: ${{ steps.apks.outputs.dir }}
+        run: |
+          case "$CHANNEL" in
+            stable) CHANNEL_CN="稳定版" ;;
+            beta)   CHANNEL_CN="测试版" ;;
+            dev)    CHANNEL_CN="开发版" ;;
+            *)      CHANNEL_CN="$CHANNEL" ;;
+          esac
+
+          PREV_TAG=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)
+          if [ -n "$PREV_TAG" ]; then
+            CHANGES=$(git log --no-merges --pretty='- %s（%h）' "${PREV_TAG}..${TAG}")
+            PREV_LINE="对比上一版本：[\`${PREV_TAG}\`](https://github.com/${REPO}/releases/tag/${PREV_TAG})"
+          else
+            CHANGES=$(git log --no-merges -n 30 --pretty='- %s（%h）')
+            PREV_LINE="首次发布，以下为最近 30 条提交。"
+          fi
+          if [ -z "$CHANGES" ]; then
+            CHANGES="- 常规维护与稳定性改进"
+          fi
+
+          CHECKSUM=$(awk '{print $1}' "$RELEASE_DIR/SHA256SUMS.txt" | head -1)
+
+          {
+            echo "## OlliteRT ${TAG}（${CHANNEL_CN}）"
+            echo ""
+            echo "**构建时间：** ${STAMP}（北京时间）"
+            echo ""
+            echo "### 更新内容"
+            echo ""
+            echo "$CHANGES"
+            echo ""
+            echo "$PREV_LINE"
+            echo ""
+            echo "### 下载安装"
+            echo ""
+            echo "| 文件 | 适用设备 |"
+            echo "|------|----------|"
+            echo "| \`${APK_NAME}\` | arm64-v8a，Android 12 及以上 |"
+            echo ""
+            echo "**GitHub Release 直链（支持断点续传）：**"
+            echo ""
+            echo "\`https://github.com/${REPO}/releases/download/${TAG}/${APK_NAME}\`"
+            echo ""
+            echo "**国内加速（第三方镜像，在直链前加上镜像前缀）：**"
+            echo ""
+            echo "\`https://ghproxy.net/https://github.com/${REPO}/releases/download/${TAG}/${APK_NAME}\`"
+            echo ""
+            echo "\`https://ghfast.top/https://github.com/${REPO}/releases/download/${TAG}/${APK_NAME}\`"
+            echo ""
+            echo "> Release 资产支持 HTTP Range，可用 IDM / aria2 等多线程下载并断点续传；Actions 产物不支持断点续传。"
+            echo ""
+            echo "### SHA256 校验值"
+            echo ""
+            echo "\`\`\`"
+            echo "$CHECKSUM  ${APK_NAME}"
+            echo "\`\`\`"
+          } > "$RUNNER_TEMP/release_notes.md"
+
+          echo "Release notes written to $RUNNER_TEMP/release_notes.md"
+
       - name: Create GitHub Release
         if: ${{ github.event.inputs.build_only != 'true' && (github.event_name == 'push' || github.event.inputs.publish == 'true') }}
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
-          name: OlliteRT ${{ steps.tag.outputs.tag }}
+          name: OlliteRT ${{ steps.tag.outputs.tag }}（中文版）
           prerelease: ${{ steps.tag.outputs.prerelease }}
-          generate_release_notes: true
+          body_path: ${{ runner.temp }}/release_notes.md
           files: |
             Android/src/${{ steps.apks.outputs.dir }}/*.apk
             Android/src/${{ steps.apks.outputs.dir }}/SHA256SUMS.txt

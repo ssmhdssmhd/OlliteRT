@@ -86,5 +86,7 @@ Android/src/app/dev/
 
 # Working directories
 .tmp/
+# Signing material (fixed release keystore + credentials — never commit)
+.signing/
 # Worktrees
 .worktrees/
